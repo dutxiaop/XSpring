@@ -1,4 +1,4 @@
-package lib.Utils.exceptions;
+package lib.exceptions;
 
 /**
  * Created by xiaoP on 2017/2/25.

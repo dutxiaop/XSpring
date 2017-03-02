@@ -5,4 +5,6 @@ package biz.bean;
  */
 public interface TestInterface {
     void test();
+
+    String say();
 }

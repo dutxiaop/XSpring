@@ -7,6 +7,8 @@ public class BeanConfig {
     private String id;
     private String className;
     private String initMethod;
+    private Class clazz;
+    private Object object;
 
     public BeanConfig() {
         this.id = null;
@@ -48,5 +50,29 @@ public class BeanConfig {
 
     public void setInitMethod(String initMethod) {
         this.initMethod = initMethod;
+    }
+
+    public Class getClazz() {
+        return clazz;
+    }
+
+    public void setClazz(Class clazz) {
+        this.clazz = clazz;
+    }
+
+    public Object getObject() {
+        return object;
+    }
+
+    public void setObject(Object object) {
+        this.object = object;
+    }
+
+    @Override
+    public String toString() {
+        return "BeanConfig{" +
+                "id='" + id + '\'' +
+                ", className='" + className + '\'' +
+                '}';
     }
 }
