@@ -6,9 +6,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Created by xiaoP on 2017/2/25.
+ * Created by xiaoP on 2017/3/4.
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD, ElementType.FIELD, ElementType.CONSTRUCTOR})
-public @interface XAutowired {
+@Target({ElementType.FIELD, ElementType.PARAMETER})
+public @interface XQualifier {
+    String value();
 }

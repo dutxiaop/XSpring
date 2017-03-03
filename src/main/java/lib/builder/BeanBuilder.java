@@ -4,20 +4,21 @@ import biz.config.Config;
 import com.google.common.collect.Sets;
 import lib.Utils.ExceptionHandler;
 import lib.Utils.StringUtils;
+import lib.annotations.XAutowired;
+import lib.annotations.XComponent;
+import lib.annotations.XQualifier;
+import lib.config.BeanConfig;
 import lib.exceptions.BeanInBuildingException;
 import lib.exceptions.BeanNotFoundException;
 import lib.exceptions.MultiClassFoundException;
 import lib.exceptions.MultiConstructorAnnotationException;
-import lib.annotations.XAutowired;
-import lib.annotations.XComponent;
-import lib.config.BeanConfig;
 import org.reflections.Reflections;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.*;
+import java.lang.reflect.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -45,7 +46,13 @@ public class BeanBuilder {
         Reflections reflections = new Reflections("biz.");
         Set<Class<?>> types = reflections.getTypesAnnotatedWith(XComponent.class);
         Config.beanConfigs.addAll(types.stream()
-                .map(t -> new BeanConfig(t.getSimpleName(), t.getName()))
+                .map(t -> {
+                    XComponent annotation = t.getDeclaredAnnotation(XComponent.class);
+                    String id = annotation.value();
+                    if (StringUtils.isEmpty(id)){
+                        id = t.getSimpleName();
+                    }
+                    return new BeanConfig(id, t.getName());})
                 .collect(Collectors.toList()));
         //set class
         for (BeanConfig config : Config.beanConfigs) {
@@ -67,7 +74,7 @@ public class BeanBuilder {
         }
     }
 
-    private Object generateInstanceFromBeanConfig(BeanConfig beanConfig, Set<String> buildingBeans, Set<String> buildBeans) throws IllegalAccessException, InvocationTargetException, MultiClassFoundException, InstantiationException, MultiConstructorAnnotationException, ClassNotFoundException, BeanInBuildingException {
+    private Object generateInstanceFromBeanConfig(BeanConfig beanConfig, Set<String> buildingBeans, Set<String> buildBeans) throws IllegalAccessException, InvocationTargetException, MultiClassFoundException, InstantiationException, MultiConstructorAnnotationException, ClassNotFoundException, BeanInBuildingException, BeanNotFoundException {
         if (beanConfig.getObject() == null) {
             if (buildingBeans.contains(beanConfig.getId())) {
                 throw new BeanInBuildingException(beanConfig.toString());
@@ -89,11 +96,18 @@ public class BeanBuilder {
         }
     }
 
-    private void setFieldValue(Class aClass, Object obj) throws ClassNotFoundException, MultiClassFoundException, IllegalAccessException, InstantiationException, BeanInBuildingException, MultiConstructorAnnotationException, InvocationTargetException {
+    private void setFieldValue(Class aClass, Object obj) throws ClassNotFoundException, MultiClassFoundException, IllegalAccessException, InstantiationException, BeanInBuildingException, MultiConstructorAnnotationException, InvocationTargetException, BeanNotFoundException {
         Field[] fields = aClass.getDeclaredFields();
         for (Field field : fields) {
+
             if (field.getDeclaredAnnotation(XAutowired.class) != null) {
-                Object fieldObj = getBean(field.getType(), Sets.newHashSet(), Sets.newHashSet());
+                XQualifier xQualifier = field.getDeclaredAnnotation(XQualifier.class);
+                Object fieldObj = null;
+                if (xQualifier != null) {
+                    fieldObj = getBean(xQualifier.value(), Sets.newHashSet(), Sets.newHashSet());
+                } else {
+                    fieldObj = getBean(field.getType(), Sets.newHashSet(), Sets.newHashSet());
+                }
                 field.setAccessible(true);
                 field.set(obj, fieldObj);
             }
@@ -112,18 +126,18 @@ public class BeanBuilder {
         return getInstanceByBeanConfig(beanConfig, buildingBeans, buildBeans);
     }
 
-    private Object getInstanceByBeanConfig(BeanConfig beanConfig, Set<String> buildingBeans, Set<String> buildBeans) throws IllegalAccessException, InvocationTargetException, MultiClassFoundException, InstantiationException, MultiConstructorAnnotationException, ClassNotFoundException, BeanInBuildingException {
+    private Object getInstanceByBeanConfig(BeanConfig beanConfig, Set<String> buildingBeans, Set<String> buildBeans) throws IllegalAccessException, InvocationTargetException, MultiClassFoundException, InstantiationException, MultiConstructorAnnotationException, ClassNotFoundException, BeanInBuildingException, BeanNotFoundException {
         return beanConfig.getObject() != null ?
                 beanConfig.getObject() : generateInstanceFromBeanConfig(beanConfig,
                 buildingBeans == null ? Sets.newHashSet() : buildingBeans,
                 buildBeans == null ? Sets.newHashSet() : buildBeans);
     }
 
-    public Object getBean(Class clazz) throws IllegalAccessException, MultiConstructorAnnotationException, MultiClassFoundException, InstantiationException, BeanInBuildingException, InvocationTargetException, ClassNotFoundException {
+    public Object getBean(Class clazz) throws IllegalAccessException, MultiConstructorAnnotationException, MultiClassFoundException, InstantiationException, BeanInBuildingException, InvocationTargetException, ClassNotFoundException, BeanNotFoundException {
         return getBean(clazz, null, null);
     }
 
-    private Object getBean(Class clazz, Set<String> buildingBeans, Set<String> buildBeans) throws ClassNotFoundException, MultiClassFoundException, InvocationTargetException, InstantiationException, MultiConstructorAnnotationException, IllegalAccessException, BeanInBuildingException {
+    private Object getBean(Class clazz, Set<String> buildingBeans, Set<String> buildBeans) throws ClassNotFoundException, MultiClassFoundException, InvocationTargetException, InstantiationException, MultiConstructorAnnotationException, IllegalAccessException, BeanInBuildingException, BeanNotFoundException {
         List<BeanConfig> beanConfigList = beanConfigMap.values().stream()
                 .filter(config -> clazz.isAssignableFrom(config.getClazz()))
                 .collect(Collectors.toList());
@@ -138,7 +152,7 @@ public class BeanBuilder {
     }
 
 
-    private Object generateInstance(Class clazz, Set<String> buildingBeans, Set<String> buildBeans) throws InstantiationException, IllegalAccessException, MultiConstructorAnnotationException, InvocationTargetException, MultiClassFoundException, ClassNotFoundException, BeanInBuildingException {
+    private Object generateInstance(Class clazz, Set<String> buildingBeans, Set<String> buildBeans) throws InstantiationException, IllegalAccessException, MultiConstructorAnnotationException, InvocationTargetException, MultiClassFoundException, ClassNotFoundException, BeanInBuildingException, BeanNotFoundException {
         Constructor[] constructors = clazz.getDeclaredConstructors();
         if (constructors.length > 0) {
             Constructor annotationConstructor = null;
@@ -153,10 +167,16 @@ public class BeanBuilder {
                 }
             }
             if (annotationConstructor != null) {
-                Class[] params = annotationConstructor.getParameterTypes();
+                Parameter[] params = annotationConstructor.getParameters();
                 Object[] paramObjects = new Object[params.length];
                 for (int i = 0; i < params.length; ++i) {
-                    paramObjects[i] = getBean(params[i], buildingBeans, buildBeans);
+                    Parameter param = params[i];
+                    XQualifier xQualifier = param.getDeclaredAnnotation(XQualifier.class);
+                    if (xQualifier != null){
+                        paramObjects[i] = getBean(xQualifier.value(), buildingBeans, buildBeans);
+                    } else {
+                        paramObjects[i] = getBean(param.getType(), buildingBeans, buildBeans);
+                    }
                 }
                 return annotationConstructor.newInstance(paramObjects);
             }

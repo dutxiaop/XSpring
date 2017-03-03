@@ -3,6 +3,7 @@ package biz.bean.impl;
 import biz.bean.MyLogger;
 import biz.bean.TestInterface;
 import lib.annotations.XAutowired;
+import lib.annotations.XQualifier;
 
 /**
  * Created by xiaoP on 2017/2/25.
@@ -16,7 +17,7 @@ public class TestInterfaceImpl implements TestInterface {
     }
 
     @XAutowired
-    public TestInterfaceImpl(MyLogger logger) {
+    public TestInterfaceImpl(@XQualifier("myLogger") MyLogger logger) {
         this.logger = logger;
         System.out.println("TestInterfaceImpl logger");
     }
